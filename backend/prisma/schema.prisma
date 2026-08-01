@@ -1,0 +1,255 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  RECEPTIONIST
+  TRAINER
+  MEMBER
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+  OTHER
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+}
+
+model Gym {
+  id              String   @id @default(cuid())
+
+  name            String
+  logo            String?
+  currency        String @default("ARS")
+  timezone        String @default("America/Argentina/Buenos_Aires")
+
+  address         String?
+  phone           String?
+  email           String?
+
+  setupCompleted  Boolean @default(false)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users           User[]
+  members         Member[]
+  plans           Plan[]
+  auditLogs       AuditLog[]
+}
+
+model User {
+  id             String     @id @default(cuid())
+  gymId          String
+  gym            Gym        @relation(fields: [gymId], references: [id])
+  member         Member?    @relation("MemberUser")
+  createdMembers Member[]   @relation("MemberCreator")
+  name           String
+  lastname       String
+  email          String     @unique
+  password       String
+  role           UserRole
+  active         Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  auditLogs      AuditLog[]
+}
+
+model Member {
+  id               String       @id @default(cuid())
+  gymId            String
+  gym              Gym          @relation(fields: [gymId], references: [id])
+  userId           String?      @unique
+  user             User?        @relation("MemberUser", fields: [userId], references: [id])
+  firstName        String
+  lastName         String
+  dni              String?      @unique
+  email            String?
+  phone            String?
+  address          String?
+  birthDate        DateTime?
+  emergencyContact String?
+  emergencyPhone   String?
+  physicalProblems String?
+  cardiacProblems  String?
+  notes            String?
+  photo            String?
+  status           MemberStatus @default(ACTIVE)
+  createdById      String
+  createdBy        User         @relation("MemberCreator", fields: [createdById], references: [id])
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  memberships      Membership[]
+  attendances      Attendance[]
+
+  @@index([gymId])
+  @@index([lastName])
+  @@index([status])
+}
+
+model Plan {
+  id           String       @id @default(cuid())
+  gymId        String
+  gym          Gym          @relation(fields: [gymId], references: [id])
+  name         String
+  description  String?
+  durationDays Int
+  active       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  memberships  Membership[]
+
+  @@unique([gymId, name])
+}
+
+model Membership {
+  id String @id @default(cuid())
+
+  memberId String
+  member Member @relation(fields: [memberId], references: [id])
+
+  planId String
+  plan Plan @relation(fields: [planId], references: [id])
+
+  price Decimal @db.Decimal(10,2)
+
+  startDate DateTime
+  endDate DateTime
+
+  status MembershipStatus @default(ACTIVE)
+
+  observations String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoices Invoice[]
+  payments Payment[]
+
+  @@index([memberId])
+  @@index([planId])
+  @@index([status])
+}
+
+
+model Invoice {
+  id            String @id @default(cuid())
+
+  membershipId  String
+  membership    Membership @relation(fields: [membershipId], references: [id])
+
+  amount        Decimal @db.Decimal(10,2)
+
+  dueDate       DateTime
+
+  status        InvoiceStatus @default(PENDING)
+
+  createdAt     DateTime @default(now())
+
+  payments      Payment[]
+
+  @@index([membershipId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model Payment {
+  id String @id @default(cuid())
+
+  membershipId String
+  membership Membership @relation(fields: [membershipId], references: [id])
+
+  invoiceId String?
+  invoice Invoice? @relation(fields: [invoiceId], references: [id])
+
+  amount Decimal @db.Decimal(10,2)
+
+  method PaymentMethod
+
+  observations String?
+
+  paidAt DateTime @default(now())
+
+  dueDate DateTime
+
+  receiptNumber String?
+
+  createdAt DateTime @default(now())
+
+  @@index([membershipId])
+  @@index([invoiceId])
+  @@index([paidAt])
+  @@index([dueDate])
+}
+
+model Attendance {
+  id       String    @id @default(cuid())
+  memberId String
+  member   Member    @relation(fields: [memberId], references: [id])
+  checkIn  DateTime  @default(now())
+  checkOut DateTime?
+
+  @@index([memberId])
+  @@index([checkIn])
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  gymId       String
+  gym         Gym         @relation(fields: [gymId], references: [id])
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id])
+  action      AuditAction
+  entity      String
+  entityId    String
+  description String?
+  oldData     Json?
+  newData     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime    @default(now())
+
+  @@index([gymId])
+  @@index([userId])
+  @@index([entity])
+  @@index([entityId])
+  @@index([createdAt])
+}
