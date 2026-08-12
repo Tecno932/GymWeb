@@ -9,6 +9,7 @@ import {
 } from '@prisma/client';
 
 import { AuditLogService } from '../../common/services/audit-log.service';
+import { MembershipStatusService } from './membership-status.service';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -20,9 +21,14 @@ export class MembershipsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
+    private readonly membershipStatus: MembershipStatusService,
   ) {}
 
   async findAll(gymId: string) {
+    await this.membershipStatus.synchronize(
+      gymId,
+    );
+
     return this.prisma.membership.findMany({
       where: {
         member: {
@@ -43,6 +49,11 @@ export class MembershipsService {
     id: string,
     gymId: string,
   ) {
+
+    await this.membershipStatus.synchronize(
+      gymId,
+    );
+
     const membership =
       await this.prisma.membership.findFirst({
         where: {
@@ -72,6 +83,11 @@ export class MembershipsService {
     user: any,
     dto: CreateMembershipDto,
   ) {
+
+    await this.membershipStatus.synchronize(
+      user.gymId,
+    );
+
     const member =
       await this.prisma.member.findFirst({
         where: {
@@ -109,11 +125,16 @@ export class MembershipsService {
         },
       });
 
-    if (active) {
-      throw new BadRequestException(
-        'El socio ya posee una membresía activa.',
-      );
-    }
+      if (active) {
+        await this.prisma.membership.update({
+          where: {
+            id: active.id,
+          },
+          data: {
+            status: MembershipStatus.EXPIRED,
+          },
+        });
+      }
 
     const membership = await this.prisma.membership.create({
       data: {
@@ -140,6 +161,14 @@ export class MembershipsService {
       newData: membership,
     });
 
+    await this.prisma.invoice.create({
+      data: {
+        membershipId: membership.id,
+        amount: membership.price,
+        dueDate: membership.endDate,
+      },
+    });
+
     return membership;
   }
 
@@ -163,6 +192,10 @@ export class MembershipsService {
         'Membresía no encontrada',
       );
     }
+
+    await this.membershipStatus.synchronize(
+      gymId,
+    );
 
     return this.prisma.membership.update({
       where: {
