@@ -69,7 +69,7 @@ export class MembersController {
   ) {
     return this.membersService.update(
       id,
-      req.user.gymId,
+      req.user,
       dto,
     );
   }
@@ -82,7 +82,7 @@ export class MembersController {
   ) {
     return this.membersService.remove(
       id,
-      req.user.gymId,
+      req.user,
     );
   }
 }

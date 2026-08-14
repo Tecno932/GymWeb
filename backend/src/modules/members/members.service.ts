@@ -179,14 +179,14 @@ export class MembersService {
 
   async update(
     id: string,
-    gymId: string,
+    user: any,
     dto: UpdateMemberDto,
   ) {
     const member =
       await this.prisma.member.findFirst({
         where: {
           id,
-          gymId,
+          gymId: user.gymId,
         },
       });
 
@@ -196,21 +196,23 @@ export class MembersService {
       );
     }
 
-    const updated = await this.prisma.member.update({
-      where: {
-        id,
-      },
-      data: {
-        ...dto,
-        email: dto.email?.toLowerCase(),
-        birthDate: dto.birthDate
-          ? new Date(dto.birthDate)
-          : undefined,
-      },
-    });
+    const updated =
+      await this.prisma.member.update({
+        where: {
+          id,
+        },
+        data: {
+          ...dto,
+          email: dto.email?.toLowerCase(),
+          birthDate: dto.birthDate
+            ? new Date(dto.birthDate)
+            : undefined,
+        },
+      });
 
     await this.audit.create({
-      gymId,
+      gymId: user.gymId,
+      userId: user.id,
       action: AuditAction.UPDATE,
       entity: 'Member',
       entityId: updated.id,
@@ -224,13 +226,13 @@ export class MembersService {
 
   async remove(
     id: string,
-    gymId: string,
+    user: any,
   ) {
     const member =
       await this.prisma.member.findFirst({
         where: {
           id,
-          gymId,
+          gymId: user.gymId,
         },
       });
 
@@ -240,24 +242,29 @@ export class MembersService {
       );
     }
 
-    const deleted = await this.prisma.member.update({
-      where: {
-        id,
-      },
-      data: {
-        status:
-          member.status === MemberStatus.ACTIVE
-            ? MemberStatus.INACTIVE
-            : MemberStatus.ACTIVE,
-      },
-    });
+    const deleted =
+      await this.prisma.member.update({
+        where: {
+          id,
+        },
+        data: {
+          status:
+            member.status === MemberStatus.ACTIVE
+              ? MemberStatus.INACTIVE
+              : MemberStatus.ACTIVE,
+        },
+      });
 
     await this.audit.create({
-      gymId,
+      gymId: user.gymId,
+      userId: user.id,
       action: AuditAction.DELETE,
       entity: 'Member',
       entityId: deleted.id,
-      description: `Desactivó el socio ${member.firstName} ${member.lastName}`,
+      description:
+        deleted.status === MemberStatus.INACTIVE
+          ? `Desactivó el socio ${member.firstName} ${member.lastName}`
+          : `Reactivó el socio ${member.firstName} ${member.lastName}`,
       oldData: member,
       newData: deleted,
     });

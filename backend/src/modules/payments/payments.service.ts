@@ -201,61 +201,73 @@ export class PaymentsService {
     user: any,
     dto: CreatePaymentDto,
   ) {
-
-
     const membership =
       await this.prisma.membership.findFirst({
-
         where: {
-
           id: dto.membershipId,
-
           member: {
-
             gymId: user.gymId,
-
           },
-
         },
-
       });
 
-
-
     if (!membership) {
-
       throw new BadRequestException(
         'La membresía no existe',
       );
-
     }
 
+    const payment =
+      await this.prisma.payment.create({
+        data: {
+          membershipId: dto.membershipId,
 
+          invoiceId: dto.invoiceId,
 
-    return this.prisma.payment.create({
+          amount:
+            dto.amount ??
+            membership.price,
 
-      data: {
+          method: dto.method,
 
-        membershipId: dto.membershipId,
+          observations:
+            dto.observations,
 
-        invoiceId: dto.invoiceId,
+          paidAt: dto.paidAt
+            ? new Date(dto.paidAt)
+            : undefined,
 
-        amount: dto.amount ?? membership.price,
+          dueDate:
+            membership.endDate,
+        },
 
-        method: dto.method,
+        include: {
+          membership: {
+            include: {
+              member: true,
+              plan: true,
+            },
+          },
+        },
+      });
 
-        observations: dto.observations,
+    await this.audit.create({
+      gymId: user.gymId,
+      userId: user.id,
 
-        paidAt: dto.paidAt
-          ? new Date(dto.paidAt)
-          : undefined,
+      action: AuditAction.CREATE,
 
-        dueDate: membership.endDate,
+      entity: 'Payment',
 
-      },
+      entityId: payment.id,
 
+      description:
+        `Registró un pago de ${payment.membership.member.firstName} ${payment.membership.member.lastName}`,
+
+      newData: payment,
     });
 
+    return payment;
   }
 
 
@@ -264,38 +276,66 @@ export class PaymentsService {
 
   async update(
     id: string,
-    gymId: string,
+    user: any,
     dto: UpdatePaymentDto,
   ) {
-
-
-    await this.findOne(id, gymId);
-
-
-
-    return this.prisma.payment.update({
-
-      where: {
+    const payment =
+      await this.findOne(
         id,
-      },
+        user.gymId,
+      );
 
+    const updated =
+      await this.prisma.payment.update({
+        where: {
+          id,
+        },
 
-      data: {
+        data: {
+          amount:
+            dto.amount,
 
-        amount: dto.amount,
+          method:
+            dto.method,
 
-        method: dto.method,
+          observations:
+            dto.observations,
 
-        observations: dto.observations,
+          paidAt:
+            dto.paidAt
+              ? new Date(dto.paidAt)
+              : undefined,
+        },
 
-        paidAt: dto.paidAt
-          ? new Date(dto.paidAt)
-          : undefined,
+        include: {
+          membership: {
+            include: {
+              member: true,
+              plan: true,
+            },
+          },
+        },
+      });
 
-      },
+    await this.audit.create({
+      gymId: user.gymId,
+      userId: user.id,
 
+      action: AuditAction.UPDATE,
+
+      entity: 'Payment',
+
+      entityId: updated.id,
+
+      description:
+        `Actualizó el pago de ${updated.membership.member.firstName} ${updated.membership.member.lastName}`,
+
+      oldData: payment,
+
+      newData: updated,
     });
 
+    return updated;
   }
 
 
@@ -304,22 +344,38 @@ export class PaymentsService {
 
   async remove(
     id: string,
-    gymId: string,
+    user: any,
   ) {
-
-
-    await this.findOne(id, gymId);
-
-
-
-    return this.prisma.payment.delete({
-
-      where: {
+    const payment =
+      await this.findOne(
         id,
-      },
+        user.gymId,
+      );
 
+    const deleted =
+      await this.prisma.payment.delete({
+        where: {
+          id,
+        },
+      });
+
+    await this.audit.create({
+      gymId: user.gymId,
+      userId: user.id,
+
+      action: AuditAction.DELETE,
+
+      entity: 'Payment',
+
+      entityId: deleted.id,
+
+      description:
+        `Eliminó un pago de ${payment.membership.member.firstName} ${payment.membership.member.lastName}`,
+
+      oldData: payment,
     });
 
+    return deleted;
   }
 
 }

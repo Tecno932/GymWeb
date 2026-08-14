@@ -109,17 +109,15 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Actualizar un pago' })
   @Patch(':id')
   update(
-    @Req() req:any,
-    @Param('id') id:string,
-    @Body() dto:UpdatePaymentDto,
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: UpdatePaymentDto,
   ) {
-
     return this.paymentsService.update(
       id,
-      req.user.gymId,
+      req.user,
       dto,
     );
-
   }
 
 
@@ -128,15 +126,13 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Eliminar un pago' })
   @Delete(':id')
   remove(
-    @Req() req:any,
-    @Param('id') id:string,
+    @Req() req: any,
+    @Param('id') id: string,
   ) {
-
     return this.paymentsService.remove(
       id,
-      req.user.gymId,
+      req.user,
     );
-
   }
 
 }
